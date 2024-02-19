@@ -1,14 +1,15 @@
-#path=/home/tom/npf/
-#addr=client0.kth.se
-#//nfs=0
+//path=/home/tom/npf/
+//addr=client0.kth.se
+//nfs=0
 
-#0:ifname=eth0
-#0:pci=0000:03:00.0
-#0:mac=50:6b:4b:43:80:ab
+//0:ifname=eth0
+//0:pci=0000:03:00.0
+//0:mac=50:6b:4b:43:80:ab
 
 
 path=/home/qbiqing/.local/lib/python3.10/site-packages/npf
 addr=192.168.23.12
+user=qbiqing
 nfs=0
 
 0:ifname=enp129s0f0
