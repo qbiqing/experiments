@@ -1,4 +1,4 @@
-NPF_PATH=
+NPF_PATH=/home/qbiqing/.local/bin/
 NPF_SERVER=server0,nic=0
 NPF_CLIENT=client0,nic=0
 
