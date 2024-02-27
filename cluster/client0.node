@@ -8,7 +8,7 @@
 
 
 path=/home/qbiqing/.local/lib/python3.10/site-packages/npf
-addr=192.168.23.12
+addr=172.26.191.212
 user=qbiqing
 nfs=0
 
