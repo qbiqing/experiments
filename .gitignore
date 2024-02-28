@@ -3,3 +3,6 @@ build
 testie1*
 archive
 __pycache__
+
+*.pdf
+*.csv
