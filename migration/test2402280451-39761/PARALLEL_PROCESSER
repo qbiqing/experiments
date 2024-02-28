@@ -1,0 +1,18 @@
+	-> classifier :: Classifier(12/0800, -)
+	-> Strip(14)
+	-> check :: CheckIPHeader(VERBOSE true)
+//	-> IPPrint(LENGTH true)
+	-> Unstrip(14)
+    -> pip :: Pipeline()
+	-> legit :: AverageCounterIMP(IGNORE 2)
+-> manager :: FlowIPManager(CAPACITY 51200 , RESERVE 0, GROUPS 512, DEF_THREAD 15, VERBOSE 0, MARK true, DO_MIGRATION true ) 
+	-> td0;
+
+dropped :: AverageCounterIMP();
+
+classifier[1] -> Print(NonIPv4) -> dropped;
+check[1] -> dropped;
+dropped -> Discard;
+
+
+

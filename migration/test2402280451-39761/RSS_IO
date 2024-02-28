@@ -1,0 +1,2 @@
+fd0 :: FromDPDKDevice(PORT $iface, N_QUEUES $queuesNb, NUMA $numa, THREADOFFSET 0, MINTHREADS $threadsNb, MAXTHREADS $threadsNb, VERBOSE $verbose, PAUSE none, NDESC 4096, RSS_AGGREGATE 1, PROMISC false, PAINT_QUEUE true, BURST 32, MAX_RSS 15);
+

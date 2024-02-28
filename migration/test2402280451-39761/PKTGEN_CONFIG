@@ -1,0 +1,185 @@
+d :: DPDKInfo( 8016192 )
+
+define($replay_count 40)
+
+elementclass Numberise { $magic |
+    input-> Strip(14) -> check :: CheckIPHeader -> StoreData(36,$magic) ->  nPacket :: NumberPacket(40) -> SetIPChecksum -> Unstrip(14) -> output
+}
+
+elementclass Generator { $NUM, $srcmac, $dstmac, $srcip, $dstip, $th |
+    fastudp :: FastUDPFlows(RATE 0, LIMIT 2000000, LENGTH 1500, SRCETH $srcmac, DSTETH $dstmac, SRCIP $srcip, DSTIP $dstip, FLOWS 256, FLOWSIZE 1000)
+    -> MarkMACHeader
+    -> EnsureDPDKBuffer
+    -> Numberise(\<123400>$NUM)
+    -> Sprayer
+    -> replay :: ReplayUnqueue(STOP 0, QUICK_CLONE true)
+    
+    -> rt :: RecordTimestamp(N 2000000, OFFSET 54)
+    -> sndavg :: AverageCounter() //Single thread here
+    -> output;
+Idle -> puller::Null -> Discard;
+    StaticThreadSched(replay $th,puller $th);
+}
+
+elementclass Receiver { $rt |
+    input
+    -> tsd :: TimestampDiff($rt, N 80000000, SAMPLE 1 ) //MT path !!
+    -> Unstrip(14)
+    -> avg :: AverageCounterMP
+    -> Discard;
+
+    unt :: Print("WARNING: Untimestamped packet", -1)
+    -> Discard;
+    tsd[1] -> unt;
+}
+
+elementclass MultiThreadGenerator { $port, $outPort, $srcmac, $dstmac, $outSrcmac, $srcip, $dstip |
+    tdOUT::ToDPDKDevice($port, BLOCKING true);
+
+    gen0 :: Generator(\<01>, $srcmac, $dstmac, $srcip, $dstip, 0) -> tdOUT;
+    gen1 :: Generator(\<02>, $srcmac, $dstmac, $srcip, $dstip, 1) -> tdOUT;
+    gen2 :: Generator(\<03>, $srcmac, $dstmac, $srcip, $dstip, 2) -> tdOUT;
+    gen3 :: Generator(\<04>, $srcmac, $dstmac, $srcip, $dstip, 3) -> tdOUT;
+
+    fd :: FromDPDKDevice($outPort, MAC $outSrcmac, PROMISC false, VERBOSE 99)
+    -> c0 :: Classifier(12/0806 20/0001,
+                        12/0806 20/0002,
+                        12/0800,
+                        -)[2]
+    -> Strip(14)
+    -> MarkIPHeader
+//    -> fwp :: FlowWorkPackage(SEQUENTIAL 0, TABLE_SIZE 655360, FREAD 0, FWRITE 0, PREAD 0, PWRITE 0, W 0, ORDER 40, ACTIVE 1) 
+    -> magic :: Classifier( 36/12340001,
+                            36/12340002,
+                            36/12340003,
+                            36/12340004,
+                            -)
+
+    magic[0] -> rcv0 :: Receiver(gen0/rt);
+    magic[1] -> rcv1 :: Receiver(gen1/rt);
+    magic[2] -> rcv2 :: Receiver(gen2/rt);
+    magic[3] -> rcv3 :: Receiver(gen3/rt);
+
+    magic[4]
+    -> Print("WARNING: Unknown magic / untimestamped packet", -1)
+    -> Discard;
+
+    c0[3]
+    -> Print("WARNING: Non-IP packet !")
+    -> Discard;
+
+    c0[0] -> ARPResponder($srcip $srcmac)
+          -> tdOUT;
+    c0[1] -> Discard;
+
+    input -> tdOUT;
+
+display_th :: Script(TYPE PASSIVE,
+                     set indexA 0,
+                     set indexB 0,
+                     set indexC 0,
+                     set indexD 0,
+                     set stime $(now),
+                     goto next $(eq 1 0),
+                     label g,
+                     wait 0.2,
+                     set diff $(sub $(now) $time),
+                     print "Diff $diff",
+                     set time $(sub $(now) $stime),
+                     print "",
+                     //print "IGEN-$time-RESULT-ITHROUGHPUT $rx",
+                     print "IGEN-$time-RESULT-ILATENCY $(div $(add $(rcv0/tsd.average $indexA) $(rcv1/tsd.average $indexB) $(rcv2/tsd.average $indexC) $(rcv3/tsd.average $indexD)) 4)",
+                     print "IGEN-$time-RESULT-ILAT99 $(div $(add $(rcv0/tsd.perc99 $indexA) $(rcv1/tsd.perc99 $indexB) $(rcv2/tsd.perc99 $indexC) $(rcv3/tsd.perc99 $indexD)) 4)",
+                     print "IGEN-$time-RESULT-ILAT50 $(div $(add $(rcv0/tsd.perc50 $indexA) $(rcv1/tsd.perc50 $indexB) $(rcv2/tsd.perc50 $indexC) $(rcv3/tsd.perc50 $indexD)) 4)",
+                     print "IGEN-$time-RESULT-ILAT95 $(div $(add $(rcv0/tsd.perc95 $indexA) $(rcv1/tsd.perc95 $indexB) $(rcv2/tsd.perc95 $indexC) $(rcv3/tsd.perc95 $indexD)) 4)",
+
+                     print "IGEN-$time-RESULT-ILAT05 $(div $(add $(rcv0/tsd.perc 5 $indexA) $(rcv1/tsd.perc 5 $indexB) $(rcv2/tsd.perc 5 $indexC) $(rcv3/tsd.perc 5 $indexD)) 4)",
+                    // print "IGEN-$time-RESULT-ITX $tx",
+                    // print "IGEN-$time-RESULT-ILOSS $(sub $rx $tx)",
+
+                     //set received $(add $(RIN/avgA.count) $(RIN/avgB.count) $(RIN/avgC.count) $(RIN/avgD.count) ),
+                     //set sent $(add $(gen0/avgSIN.count) $(gen1/avgSIN.count) $(gen2/avgSIN.count) $(gen3/avgSIN.count) ),
+                     //print "IGEN-$time-RESULT-ICOUNT $received",
+                     //print "IGEN-$time-RESULT-IDROPPED $(sub $sent $received)",
+                     //print "IGEN-$time-RESULT-IDROPPEDPS $(div $(sub $sent $received) $diff)",
+                     set indexA $(rcv0/tsd.index),
+                     set indexB $(rcv1/tsd.index),
+                     set indexC $(rcv2/tsd.index),
+                     set indexD $(rcv3/tsd.index),
+                     
+                     goto g,
+                     label next)
+
+StaticThreadSched(display_th 8)
+
+
+
+}
+
+gen0 :: MultiThreadGenerator(0000:81:00.0, 0000:81:00.0, 6c:b3:11:53:09:9c, 6c:b3:11:53:09:9c, 6c:b3:11:53:09:9c, 10.36.159.192, 10.36.159.192)
+
+//Advertise return MAC address
+adv :: FastUDPFlows(RATE 0, LIMIT -1, LENGTH 60, SRCETH 6c:b3:11:53:09:9c, DSTETH 6c:b3:11:53:09:9c, SRCIP 10.36.159.192, DSTIP 10.36.159.192, FLOWS 1, FLOWSIZE 1, ACTIVE 0)
+ -> RatedUnqueue(1)
+ -> gen0;
+// -> ToDPDKDevice(1);
+
+DriverManager(
+    pause,
+    pause,
+    pause,
+    pause,
+    wait 5s,
+    read d.pool_count,
+    print "EVENT GEN_BEGIN\n\r",
+    print "Launching replay",
+     write gen0/display_th.run, write gen0/rcv0/avg.reset, write gen0/gen0/sndavg.reset, write gen0/gen0/replay.stop $replay_count, write gen0/gen0/replay.active true, 
+ write gen0/display_th.run, write gen0/rcv1/avg.reset, write gen0/gen1/sndavg.reset, write gen0/gen1/replay.stop $replay_count, write gen0/gen1/replay.active true, 
+ write gen0/display_th.run, write gen0/rcv2/avg.reset, write gen0/gen2/sndavg.reset, write gen0/gen2/replay.stop $replay_count, write gen0/gen2/replay.active true, 
+ write gen0/display_th.run, write gen0/rcv3/avg.reset, write gen0/gen3/sndavg.reset, write gen0/gen3/replay.stop $replay_count, write gen0/gen3/replay.active true, 
+    set starttime $(now),
+    pause,
+    read d.pool_count,
+    goto adump $(eq 0 0),
+    print "Dumping latency samples to $LATENCYDUMP",
+    print >$LATENCYDUMP "",
+     print >>$LATENCYDUMP $(gen0/rcv0/tsd.dump_list), 
+ print >>$LATENCYDUMP $(gen0/rcv1/tsd.dump_list), 
+ print >>$LATENCYDUMP $(gen0/rcv2/tsd.dump_list), 
+ print >>$LATENCYDUMP $(gen0/rcv3/tsd.dump_list), 
+    label adump,
+    print "RESULT-TESTTIME $(sub $(now) $starttime)",
+    print "RESULT-RCVTIME $(gen0/rcv0/avg.time)",
+    print "RESULT-LATENCY $(div $(add  $(gen0/rcv0/tsd.average) 
+ $(gen0/rcv1/tsd.average) 
+ $(gen0/rcv2/tsd.average) 
+ $(gen0/rcv3/tsd.average)  0) 4)",
+                goto alatval $(eq 0 0),
+                set i 0,
+                set step 1,
+                label perc,
+                print "CDFLATVAL-$(math.perc $i)-RESULT-CDFLATPC $(div $i 100.0)",
+                set i $(add $i $step),
+                set step $(if $(ge $i 99) 0.1 1),
+                goto perc $(le $i 100.0),
+                label alatval,
+
+    print "RESULT-TX $(add  $(gen0/gen0/sndavg.link_rate) 
+ $(gen0/gen1/sndavg.link_rate) 
+ $(gen0/gen2/sndavg.link_rate) 
+ $(gen0/gen3/sndavg.link_rate)  )",
+    print "RESULT-PPS $(add  $(gen0/rcv0/avg.rate) 
+ $(gen0/rcv1/avg.rate) 
+ $(gen0/rcv2/avg.rate) 
+ $(gen0/rcv3/avg.rate)  )",
+    print "RESULT-THROUGHPUT $(add  $(gen0/rcv0/avg.link_rate) 
+ $(gen0/rcv1/avg.link_rate) 
+ $(gen0/rcv2/avg.link_rate) 
+ $(gen0/rcv3/avg.link_rate)  )",
+    print "RESULT-RCV_OUTOFORDER $(gen0/fwp.outoforder)",
+    set count $(add  $(gen0/gen0/sndavg.count) 
+ $(gen0/gen1/sndavg.count) 
+ $(gen0/gen2/sndavg.count) 
+ $(gen0/gen3/sndavg.count) ),
+    print "RESULT-RCV_OUTOFORDERPC $(div $(gen0/fwp.outoforder) $count)"
+)

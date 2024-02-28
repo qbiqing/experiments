@@ -1,0 +1,4 @@
+fd0 :: FromDPDKDevice(PORT $iface, N_QUEUES 1, NUMA $numa, THREADOFFSET 0, MAXTHREADS $dispatcherNb, VERBOSE $verbose, PAUSE none, NDESC 4096, PROMISC true, PAINT_QUEUE true, BURST 32);
+
+fd0
+

@@ -1,0 +1,19 @@
+
+DPDKInfo(100000);
+define(
+	$iface      0000:03:00.0,
+    $dispatcherNb 1,
+	$numa       false,
+	$verbose    99,
+    $npf_root   ../..
+);
+
+elementclass Pipeline {
+
+    input
+    -> wp :: WorkPackage(W 100, S 1, N 1, R 0, PAYLOAD false, ANALYSIS 0)
+    -> EtherRewrite(SRC ae:aa:aa:59:7d:09, DST 6c:b3:11:53:09:9c)
+    -> output;
+}
+td0 :: ToDPDKDevice(PORT $iface, VERBOSE $verbose, BLOCKING 0);
+

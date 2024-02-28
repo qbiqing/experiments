@@ -1,0 +1,67 @@
+	-> classifier :: Classifier(12/0800, -)
+	-> Strip(14)
+    -> MarkIPHeader
+    -> disp;
+
+elementclass Processer { $thread, $active |
+    input[0]
+    -> uq :: Unqueue(ACTIVE $active, SIGNAL false)
+//    -> counter :: Counter()
+	-> check :: CheckIPHeader(VERBOSE true)
+//	-> IPPrint(LENGTH true)
+	-> Unstrip(14)
+    -> pip :: Pipeline()
+	-> [0]output;
+
+    check[1] -> [1]output;
+    StaticThreadSched(uq $thread);
+}
+
+	legit :: AverageCounterIMP(IGNORE 2)
+    ->  ps :: PaintSwitch()[0-17] => queuecount :: {
+         input[0] -> q0 :: CounterMP -> [0]output; 
+ input[1] -> q1 :: CounterMP -> [0]output; 
+ input[2] -> q2 :: CounterMP -> [0]output; 
+ input[3] -> q3 :: CounterMP -> [0]output; 
+ input[4] -> q4 :: CounterMP -> [0]output; 
+ input[5] -> q5 :: CounterMP -> [0]output; 
+ input[6] -> q6 :: CounterMP -> [0]output; 
+ input[7] -> q7 :: CounterMP -> [0]output; 
+ input[8] -> q8 :: CounterMP -> [0]output; 
+ input[9] -> q9 :: CounterMP -> [0]output; 
+ input[10] -> q10 :: CounterMP -> [0]output; 
+ input[11] -> q11 :: CounterMP -> [0]output; 
+ input[12] -> q12 :: CounterMP -> [0]output; 
+ input[13] -> q13 :: CounterMP -> [0]output; 
+ input[14] -> q14 :: CounterMP -> [0]output; 
+ input[15] -> q15 :: CounterMP -> [0]output; 
+ input[16] -> q16 :: CounterMP -> [0]output; 
+ input[17] -> q17 :: CounterMP -> [0]output; 
+    }
+    -> manager :: FlowIPManager(CAPACITY 51200 , RESERVE 0, GROUPS 512, DEF_THREAD 15, VERBOSE 0, MARK true, DO_MIGRATION true ) 
+    -> td0;
+    dropped :: AverageCounterIMP(IGNORE 2);
+    dropped -> Discard;
+
+
+classifier[1] -> Print(NonIPv4) -> Discard;
+
+ disp[0] -> Paint(0) -> p0 :: Processer(1, 1 ) -> legit; p0[1]->dropped; 
+ disp[1] -> Paint(1) -> p1 :: Processer(2, 1 ) -> legit; p1[1]->dropped; 
+ disp[2] -> Paint(2) -> p2 :: Processer(3, 1 ) -> legit; p2[1]->dropped; 
+ disp[3] -> Paint(3) -> p3 :: Processer(4, 1 ) -> legit; p3[1]->dropped; 
+ disp[4] -> Paint(4) -> p4 :: Processer(5, 1 ) -> legit; p4[1]->dropped; 
+ disp[5] -> Paint(5) -> p5 :: Processer(6, 1 ) -> legit; p5[1]->dropped; 
+ disp[6] -> Paint(6) -> p6 :: Processer(7, 1 ) -> legit; p6[1]->dropped; 
+ disp[7] -> Paint(7) -> p7 :: Processer(8, 1 ) -> legit; p7[1]->dropped; 
+ disp[8] -> Paint(8) -> p8 :: Processer(9, 1 ) -> legit; p8[1]->dropped; 
+ disp[9] -> Paint(9) -> p9 :: Processer(10, 1 ) -> legit; p9[1]->dropped; 
+ disp[10] -> Paint(10) -> p10 :: Processer(11, 1 ) -> legit; p10[1]->dropped; 
+ disp[11] -> Paint(11) -> p11 :: Processer(12, 1 ) -> legit; p11[1]->dropped; 
+ disp[12] -> Paint(12) -> p12 :: Processer(13, 1 ) -> legit; p12[1]->dropped; 
+ disp[13] -> Paint(13) -> p13 :: Processer(14, 1 ) -> legit; p13[1]->dropped; 
+ disp[14] -> Paint(14) -> p14 :: Processer(15, 1 ) -> legit; p14[1]->dropped; 
+ disp[15] -> Paint(15) -> p15 :: Processer(16, 0 ) -> legit; p15[1]->dropped; 
+ disp[16] -> Paint(16) -> p16 :: Processer(17, 0 ) -> legit; p16[1]->dropped; 
+ disp[17] -> Paint(17) -> p17 :: Processer(18, 0 ) -> legit; p17[1]->dropped; 
+

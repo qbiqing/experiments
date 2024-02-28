@@ -1,0 +1,35 @@
+
+ migratedrv :: Script(TYPE PASSIVE, set n 1, wait 4 s, label addc, print "Scaling to 1 + $n cores",  write balancer.cpus $(add 1 $n),  wait 2s, set n $(add $n 1), goto addc ) 
+
+DriverManager(
+    read fd0.rss_reta,
+    print "EVENT RX_STARTED",
+	pause,
+	print "EVENT RX_STOPPED",
+	print "",
+	print "   IPv4: "$(legit.count),
+	print "Dropped: "$(dropped.count),
+    print "RESULT-OUTOFORDER $(fwp.outoforder)",
+    print "RESULT-OUTOFORDERPC $(div $(fwp.outoforder) $(fd0.count))",
+    print "RESULT-FWMISSED $(fd0.hw_dropped)",
+    print "RESULT-FWMISSEDPC $(div $(fd0.hw_dropped) $(add $(fd0.hw_dropped) $(fd0.hw_count)))",
+    print "RESULT-FWDROPPED $(dropped.count)",
+    print "RESULT-FWTHROUGHPUT $(legit.link_rate)",
+    print "RESULT-FWDISAPEAR $(sub $(fd0.count) $(legit.count))",
+    print "RESULT-FWHWDISAPEAR $(sub $(fd0.hw_count) $(legit.count))",
+    read fd0.xstats,
+    read balancer.run_stats,
+    print "RESULT-RUN-IMB $(balancer.run_stats_imbalance_first)",
+    print "RESULT-RUN-TIME $(balancer.run_stats_time_first)",
+	print "   Sent: "$(td0.count),
+    read useful_kcycles,
+    set cycles $(add $(useful_kcycles)),
+    print "RESULT-KCYCLES $cycles",
+    print "RESULT-KCYCLESPP $(div $cycles $(td0.count))",
+    print "RESULT-ACYCLES $(pip/wp.cycles_per_work)",
+    print "RESULT-RSSSIZE $(fd0.rss_reta_size)",
+	stop
+);
+
+StaticThreadSched(r -1)
+StaticThreadSched(s -1)
